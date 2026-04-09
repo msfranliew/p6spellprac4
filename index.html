@@ -1,0 +1,197 @@
+<script>
+  const el = (id) => document.getElementById(id);
+
+  const DEFAULT_WORDS = [
+    "collaborating",
+    "selflessly",
+    "coordination",
+    "leveraging individual strengths",
+    "working in unity",
+    "executing tasks",
+    "fostering a spirit of unity",
+    "empowerment",
+    "voice punctuated the silence",
+    "rummaging",
+    "slackened",
+    "ambushed",
+    "exhaled heavily",
+    "screamed hysterically",
+    "feigned ignorance",
+    "slumped down",
+    "laughed till his sides ached",
+    "fighting back tears",
+    "sprang to his feet",
+    "gaping in terror"
+  ];
+
+  let words = [];
+  let idx = 0;
+  let correct = 0;
+  let retry = new Set();
+  let covered = false;
+
+  function updateStats() {
+    el("prog").textContent = `${Math.min(idx + 1, words.length)}/${words.length}`;
+    el("correct").textContent = correct;
+    el("retryCount").textContent = retry.size;
+  }
+
+  function currentWord() {
+    return words[idx] || "";
+  }
+
+  function showWord() {
+    el("target").textContent = currentWord() || "—";
+  }
+
+  function setCovered(state) {
+    covered = state;
+    el("target").classList.toggle("covered", state);
+  }
+
+  function speak(text) {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 0.9;
+    window.speechSynthesis.speak(u);
+  }
+
+  function start() {
+    words = [...DEFAULT_WORDS];
+    idx = 0;
+    correct = 0;
+    retry.clear();
+
+    el("status").textContent = "Go!";
+    el("answer").disabled = false;
+    el("checkBtn").disabled = false;
+    el("nextBtn").disabled = false;
+    el("coverBtn").disabled = false;
+    el("showBtn").disabled = false;
+    el("speakBtn").disabled = false;
+
+    el("feedback").textContent = "";
+    el("summary").textContent = "";
+    el("retryBox").textContent = "";
+    el("answer").value = "";
+
+    showWord();
+    setCovered(false);
+    updateStats();
+
+    if (el("mode").value === "dictation") {
+      setCovered(true);
+      speak(currentWord());
+    }
+
+    el("answer").focus();
+  }
+
+  function resetAll() {
+    words = [];
+    idx = 0;
+    correct = 0;
+    retry.clear();
+
+    el("status").textContent = "Ready.";
+    el("target").textContent = "—";
+    el("answer").value = "";
+    el("answer").disabled = true;
+    el("checkBtn").disabled = true;
+    el("nextBtn").disabled = true;
+    el("coverBtn").disabled = true;
+    el("showBtn").disabled = true;
+    el("speakBtn").disabled = true;
+
+    el("feedback").textContent = "";
+    el("summary").textContent = "No session yet.";
+    el("retryBox").textContent = "";
+    updateStats();
+  }
+
+  function check() {
+    const target = currentWord();
+    const attempt = el("answer").value.trim();
+
+    if (!attempt) {
+      el("feedback").innerHTML = `<span class="bad">Type your spelling first.</span>`;
+      return;
+    }
+
+    if (attempt.toLowerCase() === target.toLowerCase()) {
+      correct++;
+      retry.delete(target);
+      el("feedback").innerHTML = `<span class="ok">Correct!</span>`;
+    } else {
+      retry.add(target);
+
+      const insertPos = Math.min(idx + 3, words.length);
+
+      if (!words.slice(idx + 1, idx + 4).includes(target)) {
+        words.splice(insertPos, 0, target);
+      }
+
+      el("feedback").innerHTML =
+        `<span class="bad">Not quite.</span> Correct spelling: <b>${target}</b><br>
+         <span class="muted">You will see this word again later.</span>`;
+    }
+
+    updateStats();
+  }
+
+  function next() {
+    idx++;
+    if (idx >= words.length) {
+      finish();
+      return;
+    }
+
+    el("answer").value = "";
+    el("feedback").textContent = "";
+    showWord();
+    setCovered(false);
+    updateStats();
+
+    if (el("mode").value === "dictation") {
+      setCovered(true);
+      speak(currentWord());
+    }
+
+    el("answer").focus();
+  }
+
+  function finish() {
+    el("status").textContent = "Finished!";
+    el("answer").disabled = true;
+    el("checkBtn").disabled = true;
+    el("nextBtn").disabled = true;
+    el("coverBtn").disabled = true;
+    el("showBtn").disabled = true;
+    el("speakBtn").disabled = true;
+
+    const total = words.length;
+    const acc = Math.round((correct / total) * 100) + "%";
+
+    el("summary").innerText =
+      `Words: ${total}\nCorrect: ${correct}\nAccuracy: ${acc}\nMode: ${el("mode").value}\nDate: ${new Date().toLocaleString()}`;
+
+    el("retryBox").innerHTML =
+      retry.size > 0
+        ? `<b>Retry these words:</b><br>${[...retry].join(", ")}`
+        : `<span class="ok">No retry words — well done!</span>`;
+  }
+
+  el("startBtn").addEventListener("click", start);
+  el("resetBtn").addEventListener("click", resetAll);
+  el("checkBtn").addEventListener("click", check);
+  el("nextBtn").addEventListener("click", next);
+  el("coverBtn").addEventListener("click", () => setCovered(true));
+  el("showBtn").addEventListener("click", () => setCovered(false));
+  el("speakBtn").addEventListener("click", () => speak(currentWord()));
+  el("answer").addEventListener("keydown", e => {
+    if (e.key === "Enter") check();
+  });
+
+  resetAll();
+</script>
